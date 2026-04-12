@@ -25,13 +25,12 @@ try {
 const cors = require('cors');
 
 app.use(cors({
-  origin: [
-    "http://localhost:3000",
-    "https://campbuzz-project.vercel.app"
-  ],
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
+  origin: '*',
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 }));
+
+app.options('*', cors());
 
 app.options('*', cors());
 
