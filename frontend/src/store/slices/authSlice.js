@@ -17,21 +17,20 @@ const getInitialState = () => {
   const token = localStorage.getItem('token');
   const user = localStorage.getItem('user');
   
-  // Check if token is valid
   if (token && user && !isTokenExpired(token)) {
     try {
       return {
         user: JSON.parse(user),
         token: token,
         isAuthenticated: true,
-        isLoading: false
+        isLoading: false,
+        error: null
       };
     } catch (error) {
       console.error('Error parsing stored user data:', error);
     }
   }
   
-  // Clear invalid data
   localStorage.removeItem('token');
   localStorage.removeItem('user');
   
@@ -39,7 +38,8 @@ const getInitialState = () => {
     user: null,
     token: null,
     isAuthenticated: false,
-    isLoading: false
+    isLoading: false,
+    error: null
   };
 };
 
@@ -53,28 +53,47 @@ const authSlice = createSlice({
       state.isAuthenticated = true;
       state.isLoading = false;
       
-      // Save to localStorage
       localStorage.setItem('token', action.payload.token);
       localStorage.setItem('user', JSON.stringify(action.payload.user));
     },
+
+    updateProfile: (state, action) => {
+      if (!state.user) return;
+
+      state.user = {
+        ...state.user,
+        ...action.payload
+      };
+
+      localStorage.setItem('user', JSON.stringify(state.user));
+    },
+
     logout: (state) => {
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
       state.isLoading = false;
       
-      // Clear localStorage
       localStorage.removeItem('token');
       localStorage.removeItem('user');
     },
+
     setLoading: (state, action) => {
       state.isLoading = action.payload;
     },
+
     clearError: (state) => {
       state.error = null;
     }
   },
 });
 
-export const { setCredentials, logout, setLoading, clearError } = authSlice.actions;
+export const { 
+  setCredentials, 
+  updateProfile,   // ✅ added export
+  logout, 
+  setLoading, 
+  clearError 
+} = authSlice.actions;
+
 export default authSlice.reducer;

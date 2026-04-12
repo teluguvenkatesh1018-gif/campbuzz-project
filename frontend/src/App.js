@@ -17,6 +17,8 @@ import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
 import StudentDashboard from './pages/StudentDashboard';
 import PersonalCalendar from './components/PersonalCalendar';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -106,6 +108,8 @@ function App() {
                 path="/register-admin" 
                 element={!isAuthenticated ? <RegisterAdmin /> : <Navigate to="/dashboard" replace />} 
               />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               
               {/* Protected Routes - Role-based Dashboard */}
               <Route 

@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { User } = require('../models');
 const { authMiddleware } = require('../middleware/auth');
 const Event = require('../models/Event');
@@ -81,6 +82,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
 
 // Register - UPDATED WITH BADGES
 router.post('/register', async (req, res) => {
+   console.log('📝 Registration request body:', req.body);
   try {
     const { name, collegeRoll, email, password, role } = req.body;
 
@@ -486,6 +488,119 @@ router.post('/check-achievements', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Check achievements error:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update profile (name, phone, bio, socialMedia)
+router.put('/update-profile', authMiddleware, async (req, res) => {
+  try {
+    const { name, phone, bio, socialMedia } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (name !== undefined) user.name = name;
+    if (phone !== undefined) user.phone = phone;
+    if (bio !== undefined) user.bio = bio;
+    if (socialMedia !== undefined) user.socialMedia = socialMedia;
+
+    await user.save();
+    // Remove sensitive fields
+    const userObj = user.toObject();
+    delete userObj.password;
+    delete userObj.emailVerificationToken;
+    res.json({ success: true, user: userObj });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ message: 'Server error while updating profile' });
+  }
+});
+
+// Change password
+router.put('/change-password', authMiddleware, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Verify current password
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+
+    // Set new password (the pre-save hook will hash it)
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ success: true, message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ message: 'Server error while changing password' });
+  }
+});
+
+// Forgot Password - send reset link
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'No account found with that email address.' });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    await user.save();
+
+    // Send email with reset link
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    const subject = 'CampBuzz Password Reset';
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px;">
+        <h2>Password Reset Request</h2>
+        <p>You requested to reset your password. Click the link below to set a new password:</p>
+        <a href="${resetUrl}" style="background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
+        <p>If you did not request this, please ignore this email.</p>
+        <p>This link expires in 1 hour.</p>
+      </div>
+    `;
+    const text = `Reset your password: ${resetUrl}`;
+
+    // Use your email service
+    const { sendEmail } = require('../utils/emailService');
+    await sendEmail({ to: email, subject, text, html });
+
+    res.json({ success: true, message: 'Password reset link sent to your email.' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ message: 'Server error. Please try again later.' });
+  }
+});
+
+// Reset Password - verify token and set new password
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+    if (!user) {
+      return res.status(400).json({ message: 'Password reset token is invalid or has expired.' });
+    }
+
+    // Set new password (pre-save hook will hash)
+    user.password = newPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    res.json({ success: true, message: 'Password has been reset. You can now log in with your new password.' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ message: 'Server error. Please try again.' });
   }
 });
 

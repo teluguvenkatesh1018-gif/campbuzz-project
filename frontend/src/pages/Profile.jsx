@@ -1,394 +1,441 @@
 import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
-import { authAPI } from '../services/api';
+import { useSelector, useDispatch } from 'react-redux';
+import { QRCodeSVG } from 'qrcode.react';
+import { toast } from 'react-toastify';
+import { updateProfile } from '../store/slices/authSlice';
+import { authAPI, userAPI } from '../services/api';
 
 const Profile = () => {
-  const { user: currentUser } = useSelector(state => state.auth);
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [editMode, setEditMode] = useState(false);
-  const [stats, setStats] = useState({
-    eventsCreated: 0,
-    favoritesCount: 0,
-    likesCount: 0,
-    registeredEvents: 0,
-    totalPoints: 0,
-    level: 1,
-    badgesCount: 0,
-    eventHistoryCount: 0
-  });
-
-  const [formData, setFormData] = useState({
+  const dispatch = useDispatch();
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [editForm, setEditForm] = useState({
     name: '',
-    collegeRoll: '',
     phone: '',
-    department: '',
-    bio: ''
+    bio: '',
+    socialMedia: { linkedin: '', github: '', twitter: '', portfolio: '' }
   });
+  const [adminEvents, setAdminEvents] = useState([]);
 
   useEffect(() => {
-    fetchProfileData();
-  }, []);
-
-  const fetchProfileData = async () => {
-    try {
-      setLoading(true);
-      
-      const profileResponse = await authAPI.getProfile();
-      const userData = profileResponse.data;
-      setUser(userData);
-      setFormData({
-        name: userData.name || '',
-        collegeRoll: userData.collegeRoll || '',
-        phone: userData.phone || '',
-        department: userData.department || '',
-        bio: userData.bio || ''
+    if (user) {
+      setEditForm({
+        name: user.name || '',
+        phone: user.phone || '',
+        bio: user.bio || '',
+        socialMedia: user.socialMedia || { linkedin: '', github: '', twitter: '', portfolio: '' }
       });
-
-      await fetchUserStats();
-      
-    } catch (error) {
-      console.error('Error fetching profile data:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [user]);
 
-  const fetchUserStats = async () => {
+  useEffect(() => {
+    if (user && user.role === 'admin') {
+      fetchAdminEvents();
+    }
+  }, [user]);
+
+  const fetchAdminEvents = async () => {
     try {
-      const response = await authAPI.getStats();
-      setStats(response.data);
+      const response = await userAPI.getEventsByOrganizer(user.id);
+      setAdminEvents(response.data.events || []);
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error('Failed to fetch admin events', error);
+      setAdminEvents([]);
     }
   };
 
-  const handleProfileUpdate = async (e) => {
+  const getStudentStats = () => {
+    const eventHistory = user?.eventHistory || [];
+    const attended = eventHistory.filter(e => e.action === 'attended').length;
+    const registered = eventHistory.filter(e => e.action === 'registered').length;
+    const missed = Math.max(0, registered - attended);
+    const completedEvents = attended;
+    const totalPoints = user?.totalPoints || 0;
+    const level = user?.level || 1;
+    return { attended, registered, missed, completedEvents, totalPoints, level };
+  };
+
+  const getAdminStats = () => {
+    const eventsCreated = user?.statistics?.eventsCreated || 0;
+    const now = new Date();
+    const upcoming = adminEvents.filter(e => new Date(e.date) > now).length;
+    const completed = adminEvents.filter(e => new Date(e.date) < now && e.status === 'published').length;
+    const totalAttendees = adminEvents.reduce((sum, e) => sum + (e.attendance?.length || 0), 0);
+    return { eventsCreated, upcoming, completed, totalAttendees };
+  };
+
+  const studentStats = getStudentStats();
+  const adminStats = getAdminStats();
+
+  const handleEditSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await authAPI.updateProfile(formData);
-      setUser(response.data);
-      setEditMode(false);
-      alert('Profile updated successfully!');
+      const response = await authAPI.updateProfile(editForm);
+      dispatch(updateProfile(response.data.user));
+      toast.success('Profile updated successfully');
+      setIsEditing(false);
     } catch (error) {
-      console.error('Error updating profile:', error);
-      alert(error.response?.data?.message || 'Failed to update profile');
+      toast.error(error.response?.data?.message || 'Update failed');
     }
   };
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleAvatarUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+    if (passwordData.newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
     try {
-      const formData = new FormData();
-      formData.append('avatar', file);
-      
-      const response = await authAPI.uploadAvatarFile(formData);
-      setUser({ ...user, avatar: response.data.avatar });
-      alert('Profile picture updated successfully!');
+      await authAPI.changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
+      });
+      toast.success('Password changed successfully');
+      setIsChangingPassword(false);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (error) {
-      console.error('Upload error:', error);
-      alert('Failed to upload profile picture');
+      toast.error(error.response?.data?.message || 'Failed to change password');
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading your profile...</p>
-        </div>
-      </div>
-    );
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSocialChange = (platform, value) => {
+    setEditForm(prev => ({
+      ...prev,
+      socialMedia: { ...prev.socialMedia, [platform]: value }
+    }));
+  };
+
+  const qrData = JSON.stringify({
+    userId: user?.id,
+    name: user?.name,
+    roll: user?.collegeRoll,
+    timestamp: Date.now(),
+    type: 'profile'
+  });
+
+  if (!isAuthenticated || !user) {
+    return <div className="text-center py-10">Loading profile...</div>;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-8">
-      <div className="container mx-auto px-4 max-w-4xl">
-        
-        {/* Profile Header Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8 border border-gray-100">
-          <div className="flex flex-col lg:flex-row items-center lg:items-start space-y-6 lg:space-y-0 lg:space-x-8">
-            
-            {/* Avatar Section */}
-            <div className="flex-shrink-0">
-              <div className="relative">
-                <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
-                  {user?.avatar ? (
-                    <img 
-                      src={user.avatar} 
-                      alt="Profile" 
-                      className="w-32 h-32 rounded-full object-cover border-4 border-white"
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto">
+
+        {/* Top Row: Full gradient card */}
+        <div className="bg-gradient-to-r from-blue-600 to-purple-700 rounded-2xl shadow-xl overflow-hidden mb-6">
+          <div className="flex flex-col md:flex-row">
+            {/* Left: User details */}
+            <div className="flex-1 p-6 md:p-8 text-white">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0">
+                  {user.avatar ? (
+                    <img
+                      src={user.avatar}
+                      alt={user.name}
+                      className="w-24 h-24 rounded-full border-4 border-white shadow-lg object-cover"
                     />
                   ) : (
-                    <span className="text-4xl text-white font-bold">
-                      {user?.name?.charAt(0).toUpperCase() || 'U'}
-                    </span>
+                    <div className="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center text-3xl font-bold text-white shadow-lg border-2 border-white">
+                      {user.name?.charAt(0).toUpperCase()}
+                    </div>
                   )}
                 </div>
-                <label className="absolute bottom-2 right-2 bg-white text-blue-600 p-2 rounded-full cursor-pointer shadow-lg hover:shadow-xl transition-all duration-200 border border-blue-200">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarUpload}
-                    className="hidden"
-                  />
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </label>
+                <div>
+                  <h1 className="text-4xl md:text-5xl font-bold">{user.name}</h1>
+                  <p className="text-blue-100 text-lg mt-1">{user.collegeRoll}</p>
+                  <p className="text-blue-100 mt-1">
+                    {user.department || 'AIML'} • {user.course || 'B.Tech'}
+                  </p>
+                  {user.role === 'admin' && (
+                    <span className="inline-block mt-2 bg-yellow-400 text-gray-800 text-xs px-2 py-1 rounded-full">
+                      Administrator
+                    </span>
+                  )}
+                  <div className="mt-4 flex space-x-4">
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                    >
+                      Edit Profile
+                    </button>
+                    <button
+                      onClick={() => setIsChangingPassword(true)}
+                      className="bg-white/20 text-white px-4 py-2 rounded-lg hover:bg-white/30 transition-colors"
+                    >
+                      Change Password
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-blue-100">Email:</span>
+                  <p className="font-medium text-white">{user.email}</p>
+                </div>
+                <div>
+                  <span className="text-blue-100">Phone:</span>
+                  <p className="font-medium text-white">{user.phone || 'Not provided'}</p>
+                </div>
+                <div>
+                  <span className="text-blue-100">Member since:</span>
+                  <p className="font-medium text-white">{new Date(user.createdAt).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <span className="text-blue-100">Bio:</span>
+                  <p className="font-medium text-white">{user.bio || 'No bio yet'}</p>
+                </div>
               </div>
             </div>
 
-            {/* User Info Section */}
-            <div className="flex-1 text-center lg:text-left">
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">
-                {user?.name || 'User'}
-              </h1>
-              <p className="text-xl text-gray-600 mb-4">{user?.collegeRoll}</p>
-              
-              <div className="flex flex-wrap gap-3 justify-center lg:justify-start mb-6">
-                <span className={`px-4 py-2 rounded-full text-sm font-semibold ${
-                  user?.role === 'admin' 
-                    ? 'bg-purple-100 text-purple-800 border border-purple-200' 
-                    : 'bg-green-100 text-green-800 border border-green-200'
-                }`}>
-                  {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}
-                </span>
-                <span className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-semibold border border-blue-200">
-                  Level {stats.level}
-                </span>
-                <span className="bg-orange-100 text-orange-800 px-4 py-2 rounded-full text-sm font-semibold border border-orange-200">
-                  {stats.totalPoints} Points
-                </span>
+            {/* Right: QR Code – now also on gradient */}
+            <div className="md:border-l border-white/20 p-6 md:p-8 flex flex-col items-center justify-center text-white">
+              <h3 className="text-lg font-semibold text-white mb-2">Profile QR</h3>
+              <p className="text-blue-100 text-center mb-4">
+                Scan to view profile or mark attendance
+              </p>
+              <div id="profile-qr" className="bg-white p-2 rounded-lg">
+                <QRCodeSVG value={qrData} size={160} level="H" includeMargin={true} />
               </div>
-
-              <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
-                <button
-                  onClick={() => setEditMode(!editMode)}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl font-semibold"
-                >
-                  {editMode ? 'Cancel Edit' : 'Edit Profile'}
-                </button>
-                
-                {user?.department && (
-                  <span className="bg-gray-100 text-gray-700 px-4 py-3 rounded-xl border border-gray-200 font-medium">
-                    {user.department}
-                  </span>
-                )}
-              </div>
+              <button
+                onClick={() => {
+                  const svg = document.querySelector('#profile-qr svg');
+                  if (svg) {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const svgData = new XMLSerializer().serializeToString(svg);
+                    const img = new Image();
+                    img.onload = () => {
+                      canvas.width = img.width;
+                      canvas.height = img.height;
+                      ctx.drawImage(img, 0, 0);
+                      const pngFile = canvas.toDataURL('image/png');
+                      const downloadLink = document.createElement('a');
+                      downloadLink.download = 'profile-qr.png';
+                      downloadLink.href = pngFile;
+                      downloadLink.click();
+                    };
+                    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+                  }
+                }}
+                className="mt-4 text-sm text-white underline hover:text-blue-200"
+              >
+                Download QR Code
+              </button>
+              <p className="text-xs text-blue-100 mt-3">
+                QR code changes with each visit for security.
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 text-center hover:shadow-xl transition-all duration-200">
-            <div className="text-3xl font-bold text-blue-600 mb-2">{stats.eventsCreated}</div>
-            <div className="text-sm text-gray-600 font-medium">Events Created</div>
-          </div>
-          
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 text-center hover:shadow-xl transition-all duration-200">
-            <div className="text-3xl font-bold text-green-600 mb-2">{stats.favoritesCount}</div>
-            <div className="text-sm text-gray-600 font-medium">Favorites</div>
-          </div>
-          
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 text-center hover:shadow-xl transition-all duration-200">
-            <div className="text-3xl font-bold text-purple-600 mb-2">{stats.likesCount}</div>
-            <div className="text-sm text-gray-600 font-medium">Likes</div>
-          </div>
-          
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 text-center hover:shadow-xl transition-all duration-200">
-            <div className="text-3xl font-bold text-orange-600 mb-2">{stats.registeredEvents}</div>
-            <div className="text-sm text-gray-600 font-medium">Registered</div>
-          </div>
-        </div>
+        {/* Performance Overview (unchanged) */}
+        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            <span className="bg-green-100 text-green-600 w-8 h-8 rounded-full flex items-center justify-center mr-3">
+              📊
+            </span>
+            Performance Overview
+          </h3>
 
-        {/* Edit Form / Profile Info */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-          {editMode ? (
-            <form onSubmit={handleProfileUpdate} className="space-y-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Edit Profile</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    College Roll Number *
-                  </label>
-                  <input
-                    type="text"
-                    name="collegeRoll"
-                    value={formData.collegeRoll}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Department
-                  </label>
-                  <input
-                    type="text"
-                    name="department"
-                    value={formData.department}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Bio
-                </label>
-                <textarea
-                  name="bio"
-                  value={formData.bio}
-                  onChange={handleChange}
-                  rows="4"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none"
-                  placeholder="Tell us about yourself..."
-                  maxLength="200"
-                />
-                <p className="text-sm text-gray-500 mt-2 text-right">
-                  {formData.bio.length}/200 characters
-                </p>
-              </div>
-
-              <div className="flex gap-4 pt-4">
-                <button
-                  type="submit"
-                  className="bg-green-600 text-white px-8 py-3 rounded-xl hover:bg-green-700 transition-all duration-200 shadow-lg hover:shadow-xl font-semibold"
-                >
-                  Save Changes
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditMode(false)}
-                  className="bg-gray-500 text-white px-8 py-3 rounded-xl hover:bg-gray-600 transition-all duration-200 font-semibold"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+          {user.role === 'student' ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatCard label="Events Attended" value={studentStats.attended} color="green" />
+              <StatCard label="Events Missed" value={studentStats.missed} color="red" />
+              <StatCard label="Completed Events" value={studentStats.completedEvents} color="blue" />
+              <StatCard label="Total Points" value={studentStats.totalPoints} color="purple" />
+              <StatCard label="Level" value={studentStats.level} color="orange" />
+              <StatCard label="Events Registered" value={studentStats.registered} color="indigo" />
+            </div>
           ) : (
-            <div className="space-y-8">
-              <h2 className="text-2xl font-bold text-gray-900">Profile Information</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-6">
-                  <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
-                    <h3 className="text-lg font-semibold text-blue-900 mb-4">Personal Details</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <span className="font-medium text-blue-700">College Roll:</span>
-                        <p className="text-blue-900 font-semibold text-lg">{user?.collegeRoll}</p>
-                      </div>
-                      <div>
-                        <span className="font-medium text-blue-700">Full Name:</span>
-                        <p className="text-blue-900">{user?.name}</p>
-                      </div>
-                      {user?.phone && (
-                        <div>
-                          <span className="font-medium text-blue-700">Phone:</span>
-                          <p className="text-blue-900">{user.phone}</p>
-                        </div>
-                      )}
-                      {user?.department && (
-                        <div>
-                          <span className="font-medium text-blue-700">Department:</span>
-                          <p className="text-blue-900">{user.department}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <div className="bg-purple-50 rounded-xl p-6 border border-purple-200">
-                    <h3 className="text-lg font-semibold text-purple-900 mb-4">About Me</h3>
-                    <p className="text-purple-900 leading-relaxed">
-                      {user?.bio || 'No bio provided yet. Share something about yourself!'}
-                    </p>
-                  </div>
-
-                  <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl p-6 shadow-lg">
-                    <h3 className="text-lg font-semibold mb-3">Achievement Progress</h3>
-                    <div className="flex justify-between items-center mb-2">
-                      <span>Level {stats.level}</span>
-                      <span className="font-bold">{stats.totalPoints} pts</span>
-                    </div>
-                    <div className="w-full bg-blue-400 rounded-full h-3">
-                      <div 
-                        className="bg-white rounded-full h-3 transition-all duration-500"
-                        style={{ width: `${(stats.totalPoints % 100)}%` }}
-                      ></div>
-                    </div>
-                    <p className="text-blue-100 text-sm mt-2 text-center">
-                      {100 - (stats.totalPoints % 100)} points to level {stats.level + 1}
-                    </p>
-                  </div>
-                </div>
-              </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatCard label="Events Created" value={adminStats.eventsCreated} color="blue" />
+              <StatCard label="Upcoming Events" value={adminStats.upcoming} color="green" />
+              <StatCard label="Completed Events" value={adminStats.completed} color="purple" />
+              <StatCard label="Total Attendees" value={adminStats.totalAttendees} color="orange" />
             </div>
           )}
         </div>
 
-        {/* Badges Section */}
-        {stats.badgesCount > 0 && (
-          <div className="bg-white rounded-2xl shadow-xl p-8 mt-8 border border-gray-100">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Achievements</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {user?.badges?.slice(0, 6).map((badge, index) => (
-                <div key={index} className="bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4 text-center hover:shadow-lg transition-all duration-200">
-                  <div className="text-3xl mb-2">{badge.icon}</div>
-                  <h3 className="font-semibold text-gray-900 mb-1">{badge.name}</h3>
-                  <p className="text-gray-600 text-sm">{badge.description}</p>
+        {/* Recent Activity (unchanged) */}
+        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            <span className="bg-gray-100 text-gray-600 w-8 h-8 rounded-full flex items-center justify-center mr-3">
+              📋
+            </span>
+            Recent Activity
+          </h3>
+          {user.eventHistory && user.eventHistory.length > 0 ? (
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {user.eventHistory.slice(0, 5).map((activity, idx) => (
+                <div key={idx} className="flex items-center justify-between border-b pb-2">
+                  <div>
+                    <p className="font-medium text-gray-800">
+                      {activity.action.charAt(0).toUpperCase() + activity.action.slice(1)}
+                    </p>
+                    <p className="text-sm text-gray-500">Event ID: {activity.event}</p>
+                  </div>
+                  <span className="text-xs text-gray-400">
+                    {new Date(activity.timestamp).toLocaleDateString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500">No recent activity.</p>
+          )}
+        </div>
+
+        {/* Social Links (unchanged) */}
+        {user.socialMedia && Object.values(user.socialMedia).some(v => v) && (
+          <div className="bg-white rounded-2xl shadow-xl p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">🔗 Connect with me</h3>
+            <div className="flex flex-wrap gap-4">
+              {user.socialMedia.linkedin && (
+                <a href={user.socialMedia.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:underline">LinkedIn</a>
+              )}
+              {user.socialMedia.github && (
+                <a href={user.socialMedia.github} target="_blank" rel="noopener noreferrer" className="text-gray-800 hover:underline">GitHub</a>
+              )}
+              {user.socialMedia.twitter && (
+                <a href={user.socialMedia.twitter} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Twitter</a>
+              )}
+              {user.socialMedia.portfolio && (
+                <a href={user.socialMedia.portfolio} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">Portfolio</a>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Badges Section (unchanged) */}
+        {user.badges && user.badges.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-xl p-6 mt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">🏅 Badges & Achievements</h3>
+            <div className="flex flex-wrap gap-2">
+              {user.badges.map((badge, idx) => (
+                <div key={idx} className="bg-yellow-50 border border-yellow-200 rounded-full px-3 py-1 flex items-center text-sm">
+                  <span className="mr-1">{badge.icon || '🏆'}</span>
+                  <span>{badge.name}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
+
+        {/* Edit Profile Modal */}
+        {isEditing && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-screen overflow-y-auto p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold">Edit Profile</h2>
+                <button onClick={() => setIsEditing(false)} className="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+              </div>
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Name</label>
+                  <input type="text" name="name" value={editForm.name} onChange={handleInputChange} className="mt-1 w-full border rounded-lg p-2" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Phone</label>
+                  <input type="tel" name="phone" value={editForm.phone} onChange={handleInputChange} className="mt-1 w-full border rounded-lg p-2" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Bio</label>
+                  <textarea name="bio" rows="3" value={editForm.bio} onChange={handleInputChange} className="mt-1 w-full border rounded-lg p-2"></textarea>
+                </div>
+                <div className="border-t pt-4">
+                  <h3 className="font-semibold mb-2">Social Media</h3>
+                  <div className="space-y-2">
+                    <input type="url" placeholder="LinkedIn URL" value={editForm.socialMedia.linkedin} onChange={(e) => handleSocialChange('linkedin', e.target.value)} className="w-full border rounded-lg p-2" />
+                    <input type="url" placeholder="GitHub URL" value={editForm.socialMedia.github} onChange={(e) => handleSocialChange('github', e.target.value)} className="w-full border rounded-lg p-2" />
+                    <input type="url" placeholder="Twitter URL" value={editForm.socialMedia.twitter} onChange={(e) => handleSocialChange('twitter', e.target.value)} className="w-full border rounded-lg p-2" />
+                    <input type="url" placeholder="Portfolio URL" value={editForm.socialMedia.portfolio} onChange={(e) => handleSocialChange('portfolio', e.target.value)} className="w-full border rounded-lg p-2" />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button type="button" onClick={() => setIsEditing(false)} className="px-4 py-2 border rounded-lg">Cancel</button>
+                  <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Changes</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Change Password Modal */}
+        {isChangingPassword && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold">Change Password</h2>
+                <button onClick={() => setIsChangingPassword(false)} className="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+              </div>
+              <form onSubmit={handlePasswordChange} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Current Password</label>
+                  <input
+                    type="password"
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                    className="mt-1 w-full border rounded-lg p-2"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">New Password</label>
+                  <input
+                    type="password"
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                    className="mt-1 w-full border rounded-lg p-2"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                    className="mt-1 w-full border rounded-lg p-2"
+                    required
+                  />
+                </div>
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button type="button" onClick={() => setIsChangingPassword(false)} className="px-4 py-2 border rounded-lg">Cancel</button>
+                  <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Update Password</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
+    </div>
+  );
+};
+
+const StatCard = ({ label, value, color }) => {
+  const colorClasses = {
+    green: 'bg-green-100 text-green-800',
+    red: 'bg-red-100 text-red-800',
+    blue: 'bg-blue-100 text-blue-800',
+    purple: 'bg-purple-100 text-purple-800',
+    orange: 'bg-orange-100 text-orange-800',
+    indigo: 'bg-indigo-100 text-indigo-800'
+  };
+  return (
+    <div className={`rounded-xl p-4 text-center ${colorClasses[color]}`}>
+      <p className="text-sm font-medium">{label}</p>
+      <p className="text-2xl font-bold mt-1">{value}</p>
     </div>
   );
 };

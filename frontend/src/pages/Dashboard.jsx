@@ -17,7 +17,6 @@ const Dashboard = () => {
     past: 0
   });
 
-  // Registration stats (ADDED)
   const [registrationStats, setRegistrationStats] = useState({
     totalRegistrations: 0,
     recentRegistrations: [],
@@ -32,10 +31,8 @@ const Dashboard = () => {
     fetchEvents();
   }, [filter]);
 
-  // Fetch registration stats on mount (ADDED)
   useEffect(() => {
     fetchRegistrationStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchEvents = async () => {
@@ -53,10 +50,8 @@ const Dashboard = () => {
     }
   };
 
-  // NEW: fetch registration-related stats
   const fetchRegistrationStats = async () => {
     try {
-      // You might want to create a dedicated API for dashboard stats
       const eventsResponse = await eventsAPI.getEvents({ limit: 50 });
       const eventsList = eventsResponse?.data?.events || [];
 
@@ -76,17 +71,15 @@ const Dashboard = () => {
         }
       });
 
-      // Sort by registration count desc
       popularEvents.sort((a, b) => b.registrations - a.registrations);
 
       setRegistrationStats({
         totalRegistrations,
         popularEvents: popularEvents.slice(0, 5),
-        recentRegistrations: [] // leave empty unless you have a dedicated endpoint
+        recentRegistrations: []
       });
     } catch (error) {
       console.error('Error fetching registration stats:', error);
-      // non-blocking: dashboard still shows events
     }
   };
 
@@ -181,17 +174,17 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
+      {/* Header with Gradient (matching profile) */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-700 shadow">
         <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Event Dashboard</h1>
-              <p className="text-gray-600 mt-2">Manage all your campus events in one place</p>
+              <h1 className="text-3xl font-bold text-white">Event Dashboard</h1>
+              <p className="text-blue-100 mt-2">Manage all your campus events in one place</p>
             </div>
             <Link
               to="/create-event"
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+              className="bg-white text-blue-600 px-6 py-3 rounded-lg hover:bg-gray-100 transition-colors flex items-center font-semibold shadow-md"
             >
               <span className="mr-2">+</span> Create New Event
             </Link>
@@ -200,43 +193,43 @@ const Dashboard = () => {
       </div>
 
       <div className="container mx-auto px-4 py-6">
-        {/* Quick Stats */}
+        {/* Quick Stats (already uses QuickStats component - we can leave as is or enhance) */}
         <QuickStats stats={stats} />
 
-        {/* Registration Statistics */}
+        {/* Registration Statistics - gradient cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow p-6 text-white">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-green-100 text-green-600">
+              <div className="p-3 rounded-lg bg-white/20 text-white">
                 <span className="text-xl">👥</span>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Registrations</p>
-                <p className="text-2xl font-bold text-gray-900">{registrationStats.totalRegistrations ?? 0}</p>
+                <p className="text-sm font-medium text-blue-100">Total Registrations</p>
+                <p className="text-2xl font-bold text-white">{registrationStats.totalRegistrations ?? 0}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow p-6 text-white">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-blue-100 text-blue-600">
+              <div className="p-3 rounded-lg bg-white/20 text-white">
                 <span className="text-xl">📊</span>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Active Events</p>
-                <p className="text-2xl font-bold text-gray-900">{events.length}</p>
+                <p className="text-sm font-medium text-purple-100">Active Events</p>
+                <p className="text-2xl font-bold text-white">{events.length}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-gradient-to-br from-pink-500 to-red-500 rounded-lg shadow p-6 text-white">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-purple-100 text-purple-600">
+              <div className="p-3 rounded-lg bg-white/20 text-white">
                 <span className="text-xl">⭐</span>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Most Popular</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm font-medium text-pink-100">Most Popular</p>
+                <p className="text-2xl font-bold text-white">
                   {registrationStats.popularEvents?.[0]?.registrations ?? 0}
                 </p>
               </div>
@@ -270,31 +263,51 @@ const Dashboard = () => {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setFilter('all')}
-                className={`px-4 py-2 rounded-lg transition-colors ${filter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  filter === 'all' 
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
               >
                 All Events
               </button>
               <button
                 onClick={() => setFilter('published')}
-                className={`px-4 py-2 rounded-lg transition-colors ${filter === 'published' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  filter === 'published' 
+                    ? 'bg-gradient-to-r from-green-600 to-green-700 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
               >
                 Published
               </button>
               <button
                 onClick={() => setFilter('draft')}
-                className={`px-4 py-2 rounded-lg transition-colors ${filter === 'draft' ? 'bg-yellow-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  filter === 'draft' 
+                    ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
               >
                 Drafts
               </button>
               <button
                 onClick={() => setFilter('upcoming')}
-                className={`px-4 py-2 rounded-lg transition-colors ${filter === 'upcoming' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  filter === 'upcoming' 
+                    ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
               >
                 Upcoming
               </button>
               <button
                 onClick={() => setFilter('past')}
-                className={`px-4 py-2 rounded-lg transition-colors ${filter === 'past' ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  filter === 'past' 
+                    ? 'bg-gradient-to-r from-gray-600 to-gray-700 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
               >
                 Past Events
               </button>
@@ -312,9 +325,9 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Updated Layout */}
+        {/* Main content */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Events Table - Takes 3/4 of the space */}
+          {/* Events Table */}
           <div className="lg:col-span-3">
             <div className="bg-white rounded-lg shadow overflow-hidden">
               {filteredEvents.length === 0 ? (
@@ -326,7 +339,7 @@ const Dashboard = () => {
                   </p>
                   <Link
                     to="/create-event"
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center"
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-lg hover:opacity-90 transition-colors inline-flex items-center"
                   >
                     <span className="mr-2">+</span> Create Event
                   </Link>
@@ -368,14 +381,14 @@ const Dashboard = () => {
                               </p>
                               <p className="text-sm text-gray-400 mt-1">{event.venue}</p>
                             </div>
-                          </td>
+                           </td>
                           <td className="px-6 py-4">
                             <div className="flex flex-col space-y-2">
                               <span className="text-sm text-gray-900 font-medium">{formatDate(event.date)}</span>
                               <span className="text-sm text-gray-500">{event.time}</span>
                               {getTypeBadge(event.type)}
                             </div>
-                          </td>
+                           </td>
                           <td className="px-6 py-4">
                             <div className="flex flex-col space-y-2">
                               {getStatusBadge(event.status)}
@@ -383,20 +396,28 @@ const Dashboard = () => {
                                 <button
                                   onClick={() => handleStatusChange(event._id, 'published')}
                                   disabled={event.status === 'published'}
-                                  className={`text-xs px-2 py-1 rounded ${event.status === 'published' ? 'bg-green-100 text-green-800 cursor-not-allowed' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                                  className={`text-xs px-2 py-1 rounded ${
+                                    event.status === 'published' 
+                                      ? 'bg-green-100 text-green-800 cursor-not-allowed' 
+                                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                  }`}
                                 >
                                   Publish
                                 </button>
                                 <button
                                   onClick={() => handleStatusChange(event._id, 'draft')}
                                   disabled={event.status === 'draft'}
-                                  className={`text-xs px-2 py-1 rounded ${event.status === 'draft' ? 'bg-yellow-100 text-yellow-800 cursor-not-allowed' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                                  className={`text-xs px-2 py-1 rounded ${
+                                    event.status === 'draft' 
+                                      ? 'bg-yellow-100 text-yellow-800 cursor-not-allowed' 
+                                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                  }`}
                                 >
                                   Draft
                                 </button>
                               </div>
                             </div>
-                          </td>
+                           </td>
                           <td className="px-6 py-4">
                             <div className="flex space-x-2">
                               <Link
@@ -418,8 +439,8 @@ const Dashboard = () => {
                                 Delete
                               </button>
                             </div>
-                          </td>
-                        </tr>
+                           </td>
+                         </tr>
                       ))}
                     </tbody>
                   </table>
@@ -428,9 +449,9 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Right Sidebar - Takes 1/4 of the space */}
+          {/* Right Sidebar */}
           <div className="lg:col-span-1 space-y-4">
-            {/* Even Smaller Calendar */}
+            {/* Calendar */}
             <div className="bg-white rounded-lg shadow p-3">
               <div className="text-center mb-2">
                 <h3 className="text-sm font-semibold text-gray-900">Event Calendar</h3>
@@ -438,15 +459,14 @@ const Dashboard = () => {
               <EventCalendar events={events} />
             </div>
 
-            {/* Quick Actions and Recent Activity Stacked */}
+            {/* Quick Actions & Recent Activity */}
             <div className="space-y-4">
-              {/* Quick Actions */}
               <div className="bg-white rounded-lg shadow p-3">
                 <h3 className="text-sm font-semibold text-gray-900 mb-2">Quick Actions</h3>
                 <div className="space-y-1">
                   <Link
                     to="/create-event"
-                    className="w-full bg-blue-600 text-white p-1.5 rounded text-xs hover:bg-blue-700 transition-colors flex items-center justify-center"
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white p-1.5 rounded text-xs hover:opacity-90 transition-colors flex items-center justify-center"
                   >
                     <span className="mr-1">➕</span>
                     Create Event
@@ -454,7 +474,7 @@ const Dashboard = () => {
 
                   <button
                     onClick={fetchEvents}
-                    className="w-full bg-green-600 text-white p-1.5 rounded text-xs hover:bg-green-700 transition-colors flex items-center justify-center"
+                    className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white p-1.5 rounded text-xs hover:opacity-90 transition-colors flex items-center justify-center"
                   >
                     <span className="mr-1">🔄</span>
                     Refresh
@@ -462,7 +482,7 @@ const Dashboard = () => {
 
                   <Link
                     to="/events"
-                    className="w-full bg-purple-600 text-white p-1.5 rounded text-xs hover:bg-purple-700 transition-colors flex items-center justify-center"
+                    className="w-full bg-gradient-to-r from-purple-600 to-purple-700 text-white p-1.5 rounded text-xs hover:opacity-90 transition-colors flex items-center justify-center"
                   >
                     <span className="mr-1">👀</span>
                     View Events
@@ -486,7 +506,7 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* REGISTRATION STATS (ADDED) */}
+              {/* Registration Stats */}
               <div className="bg-white rounded-lg shadow p-3">
                 <h3 className="text-sm font-semibold text-gray-900 mb-2">Registrations</h3>
                 <div className="text-sm text-gray-700 mb-3">
@@ -495,7 +515,6 @@ const Dashboard = () => {
                     <span className="text-sm font-medium">{registrationStats.totalRegistrations ?? 0}</span>
                   </div>
                 </div>
-
                 <div>
                   <h4 className="text-xs font-medium text-gray-700 mb-2">Popular events</h4>
                   {Array.isArray(registrationStats.popularEvents) && registrationStats.popularEvents.length > 0 ? (

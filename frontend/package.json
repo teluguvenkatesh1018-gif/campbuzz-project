@@ -12,6 +12,7 @@
     "html5-qrcode": "^2.3.8",
     "nodemailer": "^7.0.9",
     "qrcode": "^1.5.4",
+    "qrcode.react": "^4.2.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-redux": "^9.2.0",

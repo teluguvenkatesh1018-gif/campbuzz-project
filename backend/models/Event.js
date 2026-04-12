@@ -57,7 +57,7 @@ const eventSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  // NEW: Registration Fields
+  // Registration Fields
   registrationFields: [{
     fieldName: {
       type: String,
@@ -148,37 +148,41 @@ const eventSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Virtual for registration count
+// Virtual for registration count (with null-safety)
 eventSchema.virtual('registrationCount').get(function() {
-  return this.registeredUsers.filter(reg => reg.status === 'registered').length;
+  const users = this.registeredUsers || [];
+  return users.filter(reg => reg.status === 'registered').length;
 });
 
-// Virtual for available spots
+// Virtual for available spots (with null-safety)
 eventSchema.virtual('availableSpots').get(function() {
   if (this.maxParticipants === 0) return 'Unlimited';
-  const registeredCount = this.registeredUsers.filter(reg => reg.status === 'registered').length;
+  const users = this.registeredUsers || [];
+  const registeredCount = users.filter(reg => reg.status === 'registered').length;
   return Math.max(0, this.maxParticipants - registeredCount);
 });
 
-// Check if registration is open
+// Check if registration is open (with null-safety)
 eventSchema.methods.isRegistrationOpen = function() {
   if (!this.registrationOpen) return false;
   if (this.registrationDeadline && new Date() > this.registrationDeadline) return false;
   if (this.maxParticipants > 0) {
-    const registeredCount = this.registeredUsers.filter(reg => reg.status === 'registered').length;
+    const users = this.registeredUsers || [];
+    const registeredCount = users.filter(reg => reg.status === 'registered').length;
     return registeredCount < this.maxParticipants;
   }
   return true;
 };
 
-// Check if user is registered
+// Check if user is registered (with null-safety)
 eventSchema.methods.isUserRegistered = function(userId) {
-  return this.registeredUsers.some(reg => 
+  const users = this.registeredUsers || [];
+  return users.some(reg => 
     reg.user.toString() === userId.toString() && reg.status === 'registered'
   );
 };
 
-// Add registration
+// Add registration (ensures registeredUsers array exists)
 eventSchema.methods.addRegistration = function(userId, registrationData = {}) {
   if (!this.isRegistrationOpen()) {
     throw new Error('Registration is closed for this event');
@@ -186,6 +190,11 @@ eventSchema.methods.addRegistration = function(userId, registrationData = {}) {
   
   if (this.isUserRegistered(userId)) {
     throw new Error('User is already registered for this event');
+  }
+
+  // Initialize registeredUsers if it doesn't exist
+  if (!this.registeredUsers) {
+    this.registeredUsers = [];
   }
 
   this.registeredUsers.push({
@@ -197,16 +206,18 @@ eventSchema.methods.addRegistration = function(userId, registrationData = {}) {
   return this.save();
 };
 
-// Remove registration
+// Remove registration (with null-safety)
 eventSchema.methods.removeRegistration = function(userId) {
+  if (!this.registeredUsers) return this.save();
   this.registeredUsers = this.registeredUsers.filter(reg => 
     reg.user.toString() !== userId.toString()
   );
   return this.save();
 };
 
-// Update registration status
+// Update registration status (with null-safety)
 eventSchema.methods.updateRegistrationStatus = function(userId, status) {
+  if (!this.registeredUsers) throw new Error('No registrations found');
   const registration = this.registeredUsers.find(reg => 
     reg.user.toString() === userId.toString()
   );

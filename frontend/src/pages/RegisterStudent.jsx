@@ -6,13 +6,13 @@ const RegisterStudent = () => {
   const [formData, setFormData] = useState({
     // Personal Information
     name: '',
-    rollNo: '',
+    collegeRoll: '',        // ✅ changed from rollNo to collegeRoll
     email: '',
     phone: '',
     password: '',
     confirmPassword: '',
     
-    // Academic Information
+    // Academic Information (optional – backend may ignore if not in schema)
     collegeName: '',
     branch: '',
     section: '',
@@ -53,13 +53,10 @@ const RegisterStudent = () => {
     const errors = [];
     
     if (!formData.name.trim()) errors.push('Name is required');
-    if (!formData.rollNo.trim()) errors.push('Roll Number is required');
+    if (!formData.collegeRoll.trim()) errors.push('Roll Number is required');
     if (!formData.email.trim()) errors.push('Email is required');
     if (!formData.phone.trim()) errors.push('Phone number is required');
-    if (!formData.collegeName.trim()) errors.push('College name is required');
-    if (!formData.branch) errors.push('Branch is required');
-    if (!formData.section.trim()) errors.push('Section is required');
-    if (!formData.year) errors.push('Year is required');
+    // Academic fields optional – no validation
     if (formData.password.length < 6) errors.push('Password must be at least 6 characters');
     if (formData.password !== formData.confirmPassword) errors.push('Passwords do not match');
     
@@ -111,12 +108,16 @@ const RegisterStudent = () => {
         otp: formData.otp
       });
 
-      // If OTP verified, proceed with registration
+      // Prepare registration data (only fields that backend expects)
       const { confirmPassword, otp, isOtpSent, ...registerData } = formData;
       const response = await authAPI.register({
-        ...registerData,
-        role: 'student',
-        isVerified: true
+        name: registerData.name,
+        collegeRoll: registerData.collegeRoll,   // ✅ correct field name
+        email: registerData.email,
+        phone: registerData.phone,
+        password: registerData.password,
+        role: 'student'
+        // collegeName, branch, section, year are not in backend User model – they will be ignored
       });
       
       localStorage.setItem('token', response.data.token);
@@ -200,8 +201,8 @@ const RegisterStudent = () => {
                   </label>
                   <input
                     type="text"
-                    name="rollNo"
-                    value={formData.rollNo}
+                    name="collegeRoll"
+                    value={formData.collegeRoll}
                     onChange={handleChange}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter your roll number"
@@ -239,14 +240,14 @@ const RegisterStudent = () => {
                   />
                 </div>
 
-                {/* Academic Information */}
+                {/* Academic Information (optional) */}
                 <div className="md:col-span-2 mt-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Academic Information</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Academic Information (Optional)</h3>
                 </div>
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    College Name *
+                    College Name
                   </label>
                   <input
                     type="text"
@@ -255,20 +256,18 @@ const RegisterStudent = () => {
                     onChange={handleChange}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter your college name"
-                    required
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Branch *
+                    Branch
                   </label>
                   <select
                     name="branch"
                     value={formData.branch}
                     onChange={handleChange}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
                   >
                     <option value="">Select Branch</option>
                     {branches.map(branch => (
@@ -279,14 +278,13 @@ const RegisterStudent = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Year *
+                    Year
                   </label>
                   <select
                     name="year"
                     value={formData.year}
                     onChange={handleChange}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
                   >
                     <option value="">Select Year</option>
                     {years.map(year => (
@@ -297,7 +295,7 @@ const RegisterStudent = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Section *
+                    Section
                   </label>
                   <input
                     type="text"
@@ -306,7 +304,6 @@ const RegisterStudent = () => {
                     onChange={handleChange}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g., A, B, C"
-                    required
                   />
                 </div>
 

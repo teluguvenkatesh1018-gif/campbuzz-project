@@ -3,7 +3,7 @@ const router = express.Router();
 const OTP = require('../models/OTP');
 const User = require('../models/User');
 const { sendEmail } = require('../utils/emailService');
-const { sendSMS, getVerificationSMS } = require('../utils/smsService');
+//const { sendSMS, getVerificationSMS } = require('../utils/smsService');
 const { getVerificationEmailTemplate } = require('../utils/emailTemplates');
 
 // Send OTP
@@ -48,13 +48,11 @@ router.post('/send-otp', async (req, res) => {
     });
 
     // Send OTP via SMS (REAL)
-    if (phone) {
-      console.log(`📱 Sending real SMS OTP to ${phone}: ${otp}`);
-      await sendSMS({
-        to: phone,
-        body: getVerificationSMS(otp, purpose)
-      });
-    }
+    // Send OTP via SMS (REAL) – temporarily disabled
+if (phone) {
+  console.log(`📱 [MOCK SMS] To: ${phone} | OTP: ${otp} for ${purpose}`);
+  // await sendSMS({ to: phone, body: getVerificationSMS(otp, purpose) });
+}
 
     res.json({ 
       success: true, 
