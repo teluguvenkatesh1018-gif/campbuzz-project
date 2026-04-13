@@ -122,7 +122,18 @@ export const dashboardAPI = {
 };
 //attendance API
 export const attendanceAPI = {
-  markAttendance: (eventId) => api.post(`/events/${eventId}/attend`),
   getAttendance: (eventId) => api.get(`/events/${eventId}/attendance`),
+
+  markAttendance: (eventId) =>
+    api.post(`/events/${eventId}/attend`),
+
+  scanQR: (data) =>
+    api.post(`/events/scan-qr`, data),
+
+  generateQR: (eventId) =>
+    api.get(`/events/${eventId}/qr`),
+
+  exportAttendance: (eventId) =>
+    api.get(`/events/${eventId}/export`),
 };
 export default api;
