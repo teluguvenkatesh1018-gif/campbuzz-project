@@ -1,4 +1,4 @@
-console.log("NEW BUILD VERSION 2");
+console.log("🔥 NEW BUILD WORKING");
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://campbuzz-backend.onrender.com';
