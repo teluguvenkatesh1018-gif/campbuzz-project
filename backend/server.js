@@ -95,7 +95,7 @@ const searchRoutes = require('./routes/search');
 console.log('✅ All routes loaded successfully');
 
 // Mount API routes
-app.use('/https://campbuzz-backend.onrender.com/api/auth/login ✅', authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/comments', commentsRoutes);
 app.use('/api/likes', likesRoutes);
