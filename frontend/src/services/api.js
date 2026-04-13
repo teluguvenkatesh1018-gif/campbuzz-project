@@ -120,5 +120,9 @@ export const dashboardAPI = {
   getStudentStats: () => api.get('/dashboard/student/stats'),
   getAdminStats: () => api.get('/dashboard/admin/stats'),
 };
-
+//attendance API
+export const attendanceAPI = {
+  markAttendance: (eventId) => api.post(`/events/${eventId}/attend`),
+  getAttendance: (eventId) => api.get(`/events/${eventId}/attendance`),
+};
 export default api;
