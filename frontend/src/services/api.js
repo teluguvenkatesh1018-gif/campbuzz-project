@@ -1,10 +1,10 @@
 console.log("🔥 NEW BUILD WORKING");
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://campbuzz-backend.onrender.com';
+const API_URL = 'https://campbuzz-backend.onrender.com/api';
 
 const api = axios.create({
-  baseURL: `${API_URL}/api`,
+  baseURL: API_URL,
 });
 
 // Request interceptor to add auth token
@@ -34,11 +34,7 @@ api.interceptors.response.use(
 
 // Auth API
 export const authAPI = {
-  login: (credentials) =>
-  axios.post(
-    'https://campbuzz-backend.onrender.com/api/auth/login',
-    credentials
-  ),
+  login: (credentials) => api.post('/auth/login', credentials),
   register: (userData) => api.post('/auth/register', userData),
   getProfile: () => api.get('/auth/profile'),
   updateProfile: (data) => api.put('/auth/update-profile', data),
